@@ -105,7 +105,7 @@
                         </f:heading>
                         <f:expandedContent>
                             <Label
-                                id="expandedLabel"
+                                id="expandedLable"
                                 text="No filters active"
                             />
                         </f:expandedContent>
@@ -138,7 +138,7 @@
                                         <filterbar:control>
                                             <DatePicker
                                                 placeholder="mời bạn chọn"
-                                                change=".onSelectionChange"
+                                                change=".onFieldChange"
                                             />
                                         </filterbar:control>
                                     </filterbar:FilterGroupItem>
@@ -151,7 +151,7 @@
                                         <filterbar:control>
                                             <DatePicker
                                                 placeholder="mời bạn chọn"
-                                                change=".onSelectionChange"
+                                                change=".onFieldChange"
                                             />
                                         </filterbar:control>
                                     </filterbar:FilterGroupItem>
@@ -162,9 +162,7 @@
                                         visibleInFilterBar="true"
                                     >
                                         <filterbar:control>
-                                            <SearchField
-                                                change=".onSelectionChange"
-                                            />
+                                            <Input change=".onFieldChange" />
                                         </filterbar:control>
                                     </filterbar:FilterGroupItem>
 
@@ -183,7 +181,7 @@
                         </f:content>
                         <table:Table
                             id="table"
-                            rows="{/Product}"
+                            rows="{/ProductCollection}"
                             selectionMode="MultiToggle"
                         >
                             <table:columns>
