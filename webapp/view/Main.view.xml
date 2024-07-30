@@ -179,6 +179,24 @@
                                 </filterbar:filterGroupItems>
                             </filterbar:FilterBar>
                         </f:content>
+                        <m:OverflowToolbar>
+                            <m:Title id="title" />
+                            <m:ToolbarSpacer />
+
+                            <m:Button
+                                text="Add row"
+                                icon="sap-icon://add"
+                                type="Emphasized"
+                                press="onAddRow"
+                            />
+                            <m:Button
+                                text="Delete row"
+                                icon="sap-icon://delete"
+                                type="Reject"
+                                press="onDeleteRows"
+                            />
+                        </m:OverflowToolbar>
+
                         <table:Table
                             id="table"
                             rows="{/ProductCollection}"
@@ -186,25 +204,29 @@
                         >
                             <table:columns>
                                 <table:Column
-                                    width="8rem"
+                                    width="11rem"
                                     hAlign="Center"
                                 >
                                     <Label text="Mã PR" />
                                     <table:template>
-                                        <Text
+                                        <Link
+                                            id="inputMaPr"
                                             text="{MaPr}"
                                             wrapping="false"
+                                            press="handleDetails"
+                                            type="Emphasized"
                                         />
                                     </table:template>
                                 </table:Column>
 
                                 <table:Column
-                                    width="8rem"
+                                    width="11rem"
                                     hAlign="Center"
                                 >
                                     <Label text="Delete ID" />
                                     <table:template>
                                         <Text
+                                            id="inputDeleteId"
                                             text="{DeleteId}"
                                             wrapping="false"
                                         />
@@ -218,6 +240,7 @@
                                     <Label text="Số lượng" />
                                     <table:template>
                                         <Text
+                                            id="inputQuantity"
                                             text="{SoLuong}"
                                             wrapping="false"
                                         />
@@ -230,6 +253,7 @@
                                     <Label text="Nhà máy" />
                                     <table:template>
                                         <Text
+                                            id="inputFactory"
                                             text="{NhaMay}"
                                             wrapping="false"
                                         />
@@ -242,23 +266,13 @@
                                     <Label text="Mã P0" />
                                     <table:template>
                                         <Text
+                                            id="inputPO"
                                             text="{MaPO}"
                                             wrapping="false"
                                         />
                                     </table:template>
                                 </table:Column>
-                                <table:Column
-                                    width="11rem"
-                                    hAlign="Center"
-                                >
-                                    <Label text="Details" />
-                                    <table:template>
-                                        <Link
-                                            text="{Details}"
-                                            wrapping="false"
-                                        />
-                                    </table:template>
-                                </table:Column>
+
                                 <table:Column
                                     width="11rem"
                                     hAlign="Center"
@@ -266,8 +280,22 @@
                                     <Label text="Ngày cập nhật" />
                                     <table:template>
                                         <DatePicker
+                                            id="inputUpdateDate"
                                             placeholder="{DateUpdate}"
                                             wrapping="false"
+                                        />
+                                    </table:template>
+                                </table:Column>
+                                <table:Column
+                                    width="6rem"
+                                    hAlign="Center"
+                                >
+                                    <Label text="Action" />
+                                    <table:template>
+                                        <Button
+                                            icon="sap-icon://decline"
+                                            press="onDeleteRow"
+                                            type="Transparent"
                                         />
                                     </table:template>
                                 </table:Column>
