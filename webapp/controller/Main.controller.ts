@@ -384,7 +384,6 @@ export default class Main extends Base {
 
   // hàm thêm row
   public onAddRow(): void {
-    // Khai báo các biến để lưu trữ các trường nhập liệu
     let inputMaPr: Input;
     let inputDeleteId: Input;
     let inputQuantity: Input;
@@ -430,6 +429,9 @@ export default class Main extends Base {
       beginButton: new Button({
         text: "Save",
         press: () => {
+          const dateFormat = DateFormat.getDateInstance({
+            pattern: "dd/MM/yyyy",
+          });
           // Lấy giá trị từ các trường nhập liệu
           const newRow: Product = {
             MaPr: inputMaPr.getValue(),
@@ -437,12 +439,11 @@ export default class Main extends Base {
             SoLuong: parseFloat(inputQuantity.getValue()) || 0,
             NhaMay: inputFactory.getValue(),
             MaPO: inputPO.getValue(),
-            DateUpdate:
-              inputUpdateDate.getDateValue()?.toISOString() ||
-              new Date().toISOString(),
+            DateUpdate: dateFormat.format(
+              inputUpdateDate.getDateValue() || new Date()
+            ),
           };
 
-          // Log dữ liệu nhập
           console.log("New Row Data:", newRow);
 
           // Lấy mô hình dữ liệu và kiểm tra
