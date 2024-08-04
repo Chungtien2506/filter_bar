@@ -1,6 +1,6 @@
 import ComboBox from "sap/m/ComboBox";
-import DatePicker from "sap/m/DatePicker";
-import Input from "sap/m/Input";
+import DatePicker, { DatePicker$ChangeEvent } from "sap/m/DatePicker";
+import Input, { Input$LiveChangeEvent } from "sap/m/Input";
 import Label from "sap/m/Label";
 import MultiComboBox from "sap/m/MultiComboBox";
 import Select from "sap/m/Select";
@@ -13,16 +13,20 @@ import SmartVariantManagement from "sap/ui/comp/smartvariants/SmartVariantManage
 import JSONModel from "sap/ui/model/json/JSONModel";
 import Table from "sap/ui/table/Table";
 import { FilterData } from "../types/filter";
-import { Dict, Product } from "../types/utils";
+import { Dict, Product, ProductData } from "../types/utils";
 import Base from "./Base.controller";
 import DateFormat from "sap/ui/core/format/DateFormat";
-import UI5Date from "sap/ui/core/date/UI5Date";
 import Log from "sap/base/Log";
 import { Button$ClickEvent } from "sap/ui/webc/main/Button";
 import Dialog from "sap/m/Dialog";
 import Button from "sap/m/Button";
 import MessageBox from "sap/m/MessageBox";
 import VBox from "sap/m/VBox";
+import View from "sap/ui/core/mvc/View";
+import Form from "sap/ui/commons/form/Form";
+import FormContainer from "sap/ui/commons/form/FormContainer";
+import FormElement from "sap/ui/commons/form/FormElement";
+import ResponsiveGridLayout from "sap/ui/layout/form/ResponsiveGridLayout";
 
 export default class Main extends Base {
   private svm: SmartVariantManagement;
@@ -30,13 +34,16 @@ export default class Main extends Base {
   private snappedLabel: Label;
   private filterBar: FilterBar;
   private table: Table;
+  private view: View;
+  private detailDialog: Dialog | null;
+  private addRowDialog: Dialog | null;
 
   public onInit(): void {
     const jSonModel = this.initSampleDataModel();
     this.getView()?.setModel(jSonModel);
 
-    const view: any = this.getView();
-    view.setModel(jSonModel);
+    this.view = <View>this.getView();
+    this.view.setModel(jSonModel);
 
     this.svm = this.getControlById("svm");
     this.expandedLable = this.getControlById("expandedLable");
@@ -204,13 +211,9 @@ export default class Main extends Base {
     // console.log(values);
   }
 
-  public initSampleDataModel() {
+  public initSampleDataModel(): JSONModel {
     const model = new JSONModel();
-    const dateFormat = DateFormat.getDateInstance({
-      pattern: "dd/MM/yyyy",
-    });
 
-    // Sử dụng fetch để lấy dữ liệu JSON
     fetch(sap.ui.require.toUrl("projecttest/mockdata/product.json"))
       .then((response) => {
         if (!response.ok) {
@@ -218,48 +221,286 @@ export default class Main extends Base {
         }
         return response.json();
       })
-      .then((data) => {
-        const temp1 = [];
-        const temp2 = [];
-        const suppliersData = [];
-        const categoryData = [];
-
-        for (let i = 0; i < data.ProductCollection.length; i++) {
-          const product = data.ProductCollection[i];
-
-          // Tên nhà cung cấp
-          if (product.SupplierName && temp1.indexOf(product.SupplierName) < 0) {
-            temp1.push(product.SupplierName);
-            suppliersData.push({ Name: product.SupplierName });
-          }
-
-          // Danh mục
-          if (product.Category && temp2.indexOf(product.Category) < 0) {
-            temp2.push(product.Category);
-            categoryData.push({ Name: product.Category });
-          }
-
-          product.DeliveryDate =
-            Date.now() - (i % 10) * 4 * 24 * 60 * 60 * 1000;
-          product.DeliveryDateStr = dateFormat.format(
-            UI5Date.getInstance(product.DeliveryDate)
-          );
-          product.Heavy = product.WeightMeasure > 1000 ? "true" : "false";
-          product.Available = product.Status === "Available" ? true : false;
-        }
-
-        // Cập nhật dữ liệu
-        data.Suppliers = suppliersData;
-        data.Categories = categoryData;
+      .then((data: ProductData) => {
         model.setData(data);
       })
-      .catch((error) => {
+      .catch((error: Error) => {
         Log.error("Failed to load JSON: " + error.message);
       });
 
     // Trả về dữ liệu
     return model;
   }
+  // tạo dialog mới
+  // private createDetailDialog(): void {
+  //   if (this.detailDialog) {
+  //     this.detailDialog.destroy(); // Xóa dialog cũ nếu đã tồn tại
+  //   }
+
+  //   this.detailDialog = new Dialog({
+  //     title: "Chi Tiết",
+  //     content: new VBox({
+  //       items: [
+  //         new Label({ text: "Mã PR" }),
+  //         new Input({ id: "inputMaPr", enabled: true }),
+
+  //         new Label({ text: "Delete ID" }),
+  //         new Input({ id: "inputDeleteId", enabled: true }),
+
+  //         new Label({ text: "Số lượng" }),
+  //         new Input({ id: "inputQuantity", enabled: true }),
+
+  //         new Label({ text: "Nhà máy" }),
+  //         new Input({ id: "inputFactory", enabled: true }),
+
+  //         new Label({ text: "Mã PO" }),
+  //         new Input({ id: "inputPO", enabled: true }),
+
+  //         new Label({ text: "Ngày cập nhật" }),
+  //         new DatePicker({ id: "inputDateUpdate", enabled: true }),
+  //       ],
+  //     }),
+  //     beginButton: new Button({
+  //       text: "Close",
+  //       press: () => {
+  //         if (this.detailDialog) {
+  //           this.detailDialog.close();
+  //         }
+  //       },
+  //     }),
+  //     afterClose: () => {
+  //       if (this.detailDialog) {
+  //         this.detailDialog.destroy();
+  //         this.detailDialog = null; // Đặt lại thành null để tránh lỗi trong lần sử dụng sau
+  //       }
+  //     },
+  //     contentWidth: "400px",
+  //     contentHeight: "auto",
+  //     draggable: true,
+  //     resizable: true,
+  //   });
+  // }
+
+  private createAddRowDialog(): void {
+    if (this.addRowDialog) {
+      this.addRowDialog.destroy(); // Xóa dialog cũ nếu đã tồn tại
+      this.addRowDialog = null;
+    }
+
+    this.addRowDialog = new Dialog({
+      title: "Add Row",
+      content: new Form({
+        layout: new ResponsiveGridLayout(),
+        formContainers: [
+          new FormContainer({
+            formElements: [
+              new FormElement({
+                label: new Label({ text: "Mã PR" }),
+                fields: [
+                  new Input({
+                    id: "inputMaPr",
+                    placeholder: "Enter MaPr",
+                    valueState: "None",
+                    change: this.onChangeValue.bind(this),
+                  }),
+                ],
+              }),
+              new FormElement({
+                label: new Label({ text: "Delete ID" }),
+                fields: [
+                  new Input({
+                    id: "inputDeleteId",
+                    placeholder: "Enter DeleteId",
+                    valueState: "None",
+                    change: this.onChangeValue.bind(this),
+                  }),
+                ],
+              }),
+              new FormElement({
+                label: new Label({ text: "Số lượng" }),
+                fields: [
+                  new Input({
+                    id: "inputQuantity",
+                    placeholder: "Enter Quantity",
+                    valueState: "None",
+                    change: this.onChangeValue.bind(this),
+                  }),
+                ],
+              }),
+              new FormElement({
+                label: new Label({ text: "Nhà máy" }),
+                fields: [
+                  new Input({
+                    id: "inputFactory",
+                    placeholder: "Enter Factory",
+                    valueState: "None",
+                    change: this.onChangeValue.bind(this),
+                  }),
+                ],
+              }),
+              new FormElement({
+                label: new Label({ text: "Mã PO" }),
+                fields: [
+                  new Input({
+                    id: "inputPO",
+                    placeholder: "Enter PO",
+                    valueState: "None",
+                    change: this.onChangeValue.bind(this),
+                  }),
+                ],
+              }),
+              new FormElement({
+                label: new Label({ text: "Ngày cập nhật" }),
+                fields: [
+                  new DatePicker({
+                    id: "inputUpdateDate",
+                    placeholder: "Enter Update Date",
+                    valueState: "None",
+                    change: this.onChangeValue.bind(this),
+                  }),
+                ],
+              }),
+            ],
+          }),
+        ],
+      }),
+      beginButton: new Button({
+        text: "Save",
+        press: () => {
+          // Xóa trạng thái lỗi trước khi kiểm tra
+          const inputs = this.getDialogFields(this.addRowDialog!);
+          Object.values(inputs).forEach((input) => {
+            if (input instanceof Input || input instanceof DatePicker) {
+              input.setValueState("None");
+              input.setValueStateText("");
+            }
+          });
+
+          if (this.validateFields(inputs)) {
+            // Tạo model mới và gán giá trị từ các trường nhập liệu
+            const newModelData = {
+              MaPr: this.getFieldValue(inputs.inputMaPr),
+              DeleteId: this.getFieldValue(inputs.inputDeleteId),
+              SoLuong:
+                parseFloat(this.getFieldValue(inputs.inputQuantity)) || 0,
+              NhaMay: this.getFieldValue(inputs.inputFactory),
+              MaPO: this.getFieldValue(inputs.inputPO),
+              DateUpdate: this.getFieldValue(inputs.inputUpdateDate),
+            };
+
+            // Cập nhật model chính
+            const model = this.getView()?.getModel() as JSONModel;
+            if (model) {
+              const data =
+                (model.getProperty("/ProductCollection") as Product[]) || [];
+              data.unshift(newModelData);
+              model.setProperty("/ProductCollection", data);
+
+              MessageBox.success("Thêm hàng thành công.");
+              this.addRowDialog?.close();
+            } else {
+              MessageBox.error("No data model available.");
+            }
+          } else {
+            MessageBox.error("Please fill all the required fields.");
+          }
+        },
+      }),
+      endButton: new Button({
+        text: "Cancel",
+        press: () => this.addRowDialog?.close(),
+      }),
+      afterClose: () => {
+        if (this.addRowDialog) {
+          this.addRowDialog.destroy();
+          this.addRowDialog = null; // Đặt lại thành null để tránh lỗi trong lần sử dụng sau
+        }
+      },
+      contentWidth: "400px",
+      contentHeight: "auto",
+      draggable: true,
+      resizable: true,
+    });
+  }
+
+  public onAddRow(): void {
+    // Tạo dialog nếu chưa được tạo
+    if (!this.addRowDialog) {
+      this.createAddRowDialog();
+    }
+
+    this.addRowDialog?.open();
+  }
+
+  private onChangeValue(event: Input$LiveChangeEvent): void {
+    const input = event.getSource() as Input | DatePicker;
+    if (input) {
+      input.setValueState("None"); // Đặt trạng thái giá trị là "None" khi có thay đổi
+      input.setValueStateText(""); // Xóa thông báo lỗi
+    }
+  }
+
+  private getFieldValue(field: Input | DatePicker): string {
+    if (field instanceof Input) {
+      return field.getValue() || ""; // Trả về giá trị mặc định là chuỗi rỗng nếu không có giá trị
+    } else if (field instanceof DatePicker) {
+      const dateValue = field.getDateValue();
+      const dateFormat = DateFormat.getDateInstance({ pattern: "dd/MM/yyyy" });
+      return dateValue ? dateFormat.format(dateValue) : ""; // Trả về chuỗi rỗng nếu không có giá trị
+    }
+    return ""; // Trả về chuỗi rỗng nếu không phải Input hoặc DatePicker
+  }
+
+  private getDialogFields(dialog: Dialog): {
+    [key: string]: Input | DatePicker;
+  } {
+    const dialogContent = dialog.getContent()[0] as Form;
+    const fields: { [key: string]: Input | DatePicker } = {};
+
+    dialogContent.getFormContainers().forEach((container) => {
+      container.getFormElements().forEach((element) => {
+        element.getFields().forEach((field) => {
+          if (field instanceof Input || field instanceof DatePicker) {
+            fields[field.getId()] = field;
+          }
+        });
+      });
+    });
+
+    return fields;
+  }
+
+  private validateFields(inputs: {
+    [key: string]: Input | DatePicker;
+  }): boolean {
+    let isValid = true;
+
+    Object.keys(inputs).forEach((key) => {
+      const input = inputs[key];
+      if (input instanceof Input) {
+        const value = input.getValue();
+        if (!value) {
+          input.setValueState("Error");
+          input.setValueStateText("This field cannot be empty.");
+          isValid = false;
+        } else {
+          input.setValueState("None");
+        }
+      } else if (input instanceof DatePicker) {
+        const dateValue = input.getDateValue();
+        if (!dateValue) {
+          input.setValueState("Error");
+          input.setValueStateText("This field cannot be empty.");
+          isValid = false;
+        } else {
+          input.setValueState("None");
+        }
+      }
+    });
+
+    return isValid;
+  }
+
   // hàm chi tiết
   public handleDetails(event: Button$ClickEvent): void {
     const bindingContext = event.getSource().getBindingContext();
@@ -267,47 +508,34 @@ export default class Main extends Base {
     if (bindingContext) {
       // Lấy đối tượng sản phẩm và gán kiểu Product
       const product: Product = bindingContext.getObject() as Product;
+      const dateFormat = DateFormat.getDateInstance({ pattern: "d/M/yyyy" });
 
-      // Tạo form dialog
-      const dialog = new Dialog({
-        title: "Chi Tiết ",
-        content: new VBox({
-          items: [
-            new Label({ text: "Mã PR" }),
-            new Input({ value: product.MaPr, enabled: true }),
+      // Tạo dialog nếu chưa được tạo
+      if (!this.detailDialog) {
+        this.createDetailDialog();
+      }
 
-            new Label({ text: "Delete ID" }),
-            new Input({ value: product.DeleteId, enabled: true }),
+      // Cập nhật giá trị cho các trường trong dialog
+      const dialogContent = this.detailDialog?.getContent()[0] as VBox;
+      const inputs =
+        dialogContent?.getItems().reduce((acc, item) => {
+          if (item instanceof Input || item instanceof DatePicker) {
+            acc[item.getId()] = item;
+          }
+          return acc;
+        }, {} as { [key: string]: Input | DatePicker }) || {};
 
-            new Label({ text: "Số lượng" }),
-            new Input({ value: product.SoLuong.toString(), enabled: true }),
+      // Ép kiểu không an toàn, đảm bảo các trường chắc chắn tồn tại
+      (inputs.inputMaPr as Input).setValue(product.MaPr);
+      (inputs.inputDeleteId as Input).setValue(product.DeleteId);
+      (inputs.inputQuantity as Input).setValue(product.SoLuong.toString());
+      (inputs.inputFactory as Input).setValue(product.NhaMay);
+      (inputs.inputPO as Input).setValue(product.MaPO);
+      (inputs.inputDateUpdate as DatePicker).setValue(
+        dateFormat.format(new Date(product.DateUpdate))
+      );
 
-            new Label({ text: "Nhà máy" }),
-            new Input({ value: product.NhaMay, enabled: true }),
-
-            new Label({ text: "Mã PO" }),
-            new Input({ value: product.MaPO, enabled: true }),
-
-            new Label({ text: "Ngày cập nhật" }),
-            new DatePicker({ value: product.DateUpdate, enabled: true }),
-          ],
-        }),
-        beginButton: new Button({
-          text: "Close",
-          press: () => {
-            dialog.close();
-          },
-        }),
-        afterClose: () => {
-          dialog.destroy();
-        },
-        contentWidth: "400px", // Thiết lập chiều rộng của dialog
-        contentHeight: "auto", // Chiều cao tự động dựa trên nội dung
-        draggable: true, // Cho phép kéo dialog
-        resizable: true, // Cho phép thay đổi kích thước dialog
-      });
-
-      dialog.open();
+      this.detailDialog?.open();
     } else {
       MessageBox.error("No item selected.");
     }
@@ -364,18 +592,14 @@ export default class Main extends Base {
       onClose: (action: unknown) => {
         if (action === MessageBox.Action.OK) {
           const data = model.getProperty("/ProductCollection") as Product[];
-          const indicesToDelete = new Set(selectedIndices);
 
-          // Sử dụng reduce để tạo mảng mới mà không chứa các mục đã chọn để xóa
-          const filteredData = data.reduce<Product[]>((acc, item, index) => {
-            if (!indicesToDelete.has(index)) {
-              acc.push(item);
-            }
-            return acc;
-          }, []);
+          // Sử dụng filter để tạo mảng mới mà không chứa các mục đã chọn để xóa
+          const filteredData = data.filter(
+            (_, index) => !selectedIndices.includes(index)
+          );
 
           model.setProperty("/ProductCollection", filteredData);
-          // table.clearSelection();
+          table.clearSelection(); // Deselect all rows
           MessageBox.success("Xóa thành công.");
         }
       },
@@ -383,102 +607,169 @@ export default class Main extends Base {
   }
 
   // hàm thêm row
-  public onAddRow(): void {
-    let inputMaPr: Input;
-    let inputDeleteId: Input;
-    let inputQuantity: Input;
-    let inputFactory: Input;
-    let inputPO: Input;
-    let inputUpdateDate: DatePicker;
+  // public onAddRow(): void {
+  //   // Hàm kiểm tra tính hợp lệ của các trường nhập liệu
+  //   const validateFields = (inputs: {
+  //     [key: string]: Input | DatePicker;
+  //   }): boolean => {
+  //     let isValid = true;
 
-    // Tạo form dialog với các trường nhập liệu
-    const dialog = new Dialog({
-      title: "Add  Row",
-      content: new VBox({
-        items: [
-          new Label({ text: "Mã PR" }),
-          (inputMaPr = new Input({
-            id: "inputMaPr",
-            placeholder: "Enter MaPr",
-          })),
-          new Label({ text: "Delete ID" }),
-          (inputDeleteId = new Input({
-            id: "inputDeleteId",
-            placeholder: "Enter DeleteId",
-          })),
-          new Label({ text: "Số lượng" }),
-          (inputQuantity = new Input({
-            id: "inputQuantity",
-            placeholder: "Enter Quantity",
-            type: "Number",
-          })),
-          new Label({ text: "Nhà Máy" }),
-          (inputFactory = new Input({
-            id: "inputFactory",
-            placeholder: "Enter Factory",
-          })),
-          new Label({ text: "Mã PO" }),
-          (inputPO = new Input({ id: "inputPO", placeholder: "Enter PO" })),
-          new Label({ text: "Ngày cập nhật" }),
-          (inputUpdateDate = new DatePicker({
-            id: "inputUpdateDate",
-            placeholder: "Enter Update Date",
-          })),
-        ],
-      }),
-      beginButton: new Button({
-        text: "Save",
-        press: () => {
-          const dateFormat = DateFormat.getDateInstance({
-            pattern: "dd/MM/yyyy",
-          });
-          // Lấy giá trị từ các trường nhập liệu
-          const newRow: Product = {
-            MaPr: inputMaPr.getValue(),
-            DeleteId: inputDeleteId.getValue(),
-            SoLuong: parseFloat(inputQuantity.getValue()) || 0,
-            NhaMay: inputFactory.getValue(),
-            MaPO: inputPO.getValue(),
-            DateUpdate: dateFormat.format(
-              inputUpdateDate.getDateValue() || new Date()
-            ),
-          };
+  //     Object.keys(inputs).forEach((key) => {
+  //       const input = inputs[key];
+  //       if (input instanceof Input) {
+  //         const value = input.getValue();
+  //         if (!value) {
+  //           input.setValueState("Error");
+  //           input.setValueStateText("This field cannot be empty.");
+  //           isValid = false;
+  //         } else {
+  //           input.setValueState("None");
+  //         }
+  //       } else if (input instanceof DatePicker) {
+  //         const dateValue = input.getDateValue();
+  //         if (!dateValue) {
+  //           input.setValueState("Error");
+  //           input.setValueStateText("This field cannot be empty.");
+  //           isValid = false;
+  //         } else {
+  //           input.setValueState("None");
+  //         }
+  //       }
+  //     });
 
-          console.log("New Row Data:", newRow);
+  //     return isValid;
+  //   };
 
-          // Lấy mô hình dữ liệu và kiểm tra
-          const model = this.getView()?.getModel() as JSONModel;
-          if (model) {
-            // Lấy dữ liệu hiện tại
-            const data: Product[] =
-              model.getProperty("/ProductCollection") || [];
+  //   // Hàm tạo trường nhập liệu (Input hoặc DatePicker)
+  //   const createField = (
+  //     id: string,
+  //     placeholder: string,
+  //     type: "Input" | "DatePicker"
+  //   ): Input | DatePicker => {
+  //     if (type === "Input") {
+  //       return new Input({
+  //         id: id,
+  //         placeholder: placeholder,
+  //         tooltip: "This field cannot be empty.",
+  //         valueState: "None",
+  //         liveChange: (event: Input$LiveChangeEvent) => {
+  //           const input = event.getSource();
+  //           const value = input.getValue();
+  //           if (!value) {
+  //             input.setValueState("Error");
+  //             input.setValueStateText("This field cannot be empty.");
+  //           } else {
+  //             input.setValueState("None");
+  //           }
+  //         },
+  //       });
+  //     } else {
+  //       return new DatePicker({
+  //         id: id,
+  //         placeholder: placeholder,
+  //         tooltip: "This field cannot be empty.",
+  //         valueState: "None",
+  //         change: (event: DatePicker$ChangeEvent) => {
+  //           const datePicker = event.getSource();
+  //           const dateValue = datePicker.getDateValue();
+  //           if (!dateValue) {
+  //             datePicker.setValueState("Error");
+  //             datePicker.setValueStateText("This field cannot be empty.");
+  //           } else {
+  //             datePicker.setValueState("None");
+  //           }
+  //         },
+  //       });
+  //     }
+  //   };
 
-            // Thêm hàng mới vào mảng dữ liệu
-            data.unshift(newRow);
+  //   // Tạo các trường nhập liệu
+  //   const inputs: { [key: string]: Input | DatePicker } = {
+  //     inputMaPr: createField("inputMaPr", "Enter MaPr", "Input"),
+  //     inputDeleteId: createField("inputDeleteId", "Enter DeleteId", "Input"),
+  //     inputQuantity: createField("inputQuantity", "Enter Quantity", "Input"),
+  //     inputFactory: createField("inputFactory", "Enter Factory", "Input"),
+  //     inputPO: createField("inputPO", "Enter PO", "Input"),
+  //     inputUpdateDate: createField(
+  //       "inputUpdateDate",
+  //       "Enter Update Date",
+  //       "DatePicker"
+  //     ),
+  //   };
 
-            // Cập nhật mô hình dữ liệu
-            model.setProperty("/ProductCollection", data);
+  //   // Tạo dialog với các trường nhập liệu
+  //   const dialog = new Dialog({
+  //     title: "Add Row",
+  //     content: new Form({
+  //       layout: new ResponsiveGridLayout(),
+  //       formContainers: [
+  //         new FormContainer({
+  //           formElements: Object.keys(inputs).map(
+  //             (key) =>
+  //               new FormElement({
+  //                 label: new Label({ text: key }),
+  //                 fields: [inputs[key]],
+  //               })
+  //           ),
+  //         }),
+  //       ],
+  //     }),
+  //     beginButton: new Button({
+  //       text: "Save",
+  //       press: () => {
+  //         // Xóa trạng thái lỗi trước khi kiểm tra
+  //         Object.values(inputs).forEach((input) => {
+  //           if (input instanceof Input || input instanceof DatePicker) {
+  //             input.setValueState("None");
+  //             input.setValueStateText("");
+  //           }
+  //         });
 
-            // Đóng dialog
-            dialog.close();
-          } else {
-            MessageBox.error("No data model available.");
-          }
-        },
-      }),
-      endButton: new Button({
-        text: "Cancel",
-        press: () => dialog.close(),
-      }),
-      afterClose: () => dialog.destroy(), // Xóa dialog sau khi đóng
-      contentWidth: "400px", // Thiết lập chiều rộng của dialog
-      contentHeight: "auto", // Chiều cao tự động dựa trên nội dung
-      draggable: true, // Cho phép kéo dialog
-      resizable: true, // Cho phép thay đổi kích thước dialog
-    });
+  //         if (validateFields(inputs)) {
+  //           // Tạo model mới và gán giá trị từ các trường nhập liệu
+  //           const newModelData = {
+  //             MaPr: this.getFieldValue(inputs.inputMaPr),
+  //             DeleteId: this.getFieldValue(inputs.inputDeleteId),
+  //             SoLuong:
+  //               parseFloat(this.getFieldValue(inputs.inputQuantity)) || 0,
+  //             NhaMay: this.getFieldValue(inputs.inputFactory),
+  //             MaPO: this.getFieldValue(inputs.inputPO),
+  //             DateUpdate: this.getFieldValue(inputs.inputUpdateDate),
+  //           };
 
-    dialog.open();
-  }
+  //           // Cập nhật model chính
+  //           const model = this.getView()?.getModel() as JSONModel;
+  //           if (model) {
+  //             const data =
+  //               (model.getProperty("/ProductCollection") as Product[]) || [];
+  //             data.unshift(newModelData);
+  //             model.setProperty("/ProductCollection", data);
+
+  //             // Hiển thị thông báo thành công
+  //             MessageBox.success("Thêm hàng thành công.");
+
+  //             dialog.close();
+  //           } else {
+  //             MessageBox.error("No data model available.");
+  //           }
+  //         } else {
+  //           MessageBox.error("Please fill all the required fields.");
+  //         }
+  //       },
+  //     }),
+  //     endButton: new Button({
+  //       text: "Cancel",
+  //       press: () => dialog.close(),
+  //     }),
+  //     afterClose: () => dialog.destroy(), // Xóa dialog sau khi đóng
+  //     contentWidth: "400px",
+  //     contentHeight: "auto",
+  //     draggable: true,
+  //     resizable: true,
+  //   });
+
+  //   dialog.open();
+  // }
 
   // lấy ra số thứ tự của các ô mình đã chọn
 
@@ -514,5 +805,89 @@ export default class Main extends Base {
   // public onSwitchChange(event: Switch$ChangeEvent) {
   //   const table = this.byId("table");
   //   table.setEnableSelectAll(event.getParameter("state"));
+  // }
+
+  private createDetailDialog(): void {
+    if (this.detailDialog) {
+      this.detailDialog.destroy();
+      this.detailDialog = null;
+    }
+
+    this.detailDialog = new Dialog({
+      title: "Chi Tiết",
+      content: new VBox({
+        items: [
+          new Label({ text: "Mã PR" }),
+          new Input({ id: "inputMaPr", enabled: true }),
+
+          new Label({ text: "Delete ID" }),
+          new Input({ id: "inputDeleteId", enabled: true }),
+
+          new Label({ text: "Số lượng" }),
+          new Input({ id: "inputQuantity", enabled: true }),
+
+          new Label({ text: "Nhà máy" }),
+          new Input({ id: "inputFactory", enabled: true }),
+
+          new Label({ text: "Mã PO" }),
+          new Input({ id: "inputPO", enabled: true }),
+
+          new Label({ text: "Ngày cập nhật" }),
+          new DatePicker({ id: "inputDateUpdate", enabled: true }),
+        ],
+      }),
+      beginButton: new Button({
+        text: "Close",
+        press: () => {
+          this.detailDialog?.close();
+        },
+      }),
+      afterClose: () => {
+        this.detailDialog?.destroy();
+        this.detailDialog = null;
+      },
+      contentWidth: "400px",
+      contentHeight: "auto",
+      draggable: true,
+      resizable: true,
+    });
+  }
+
+  // public handleDetails(event: Button$ClickEvent): void {
+  //   const bindingContext = event.getSource().getBindingContext();
+
+  //   if (bindingContext) {
+  //     const product: Product = bindingContext.getObject() as Product;
+
+  //     // Chuyển đổi giá trị ngày từ chuỗi thành đối tượng Date, hoặc null nếu không có giá trị
+  //     const dateUpdateValue: Date | null = product.DateUpdate
+  //       ? new Date(product.DateUpdate)
+  //       : null;
+
+  //     if (!this.detailDialog) {
+  //       this.createDetailDialog();
+  //     }
+
+  //     if (this.detailDialog) {
+  //       const inputs = this.getDialogFields(this.detailDialog);
+
+  //       (inputs["inputMaPr"] as Input)?.setValue(product.MaPr || "");
+  //       (inputs["inputDeleteId"] as Input)?.setValue(product.DeleteId || "");
+  //       (inputs["inputQuantity"] as Input)?.setValue(
+  //         product.SoLuong ? product.SoLuong.toString() : ""
+  //       );
+  //       (inputs["inputFactory"] as Input)?.setValue(product.NhaMay || "");
+  //       (inputs["inputPO"] as Input)?.setValue(product.MaPO || "");
+
+  //       // Chỉ đặt giá trị ngày nếu dateUpdateValue không phải là null
+  //       (inputs["inputDateUpdate"] as DatePicker)?.setDateValue(
+  //         dateUpdateValue ?? undefined
+  //       );
+
+  //       this.detailDialog.open();
+  //     }
+  //   } else {
+  //     MessageBox.error("No item selected.");
+  //   }
   // }
 }

@@ -8,3 +8,7 @@ export interface Product {
   DateUpdate: string;
   MaPr: string;
 }
+
+export interface ProductData {
+  ProductCollection: Product[];
+}
