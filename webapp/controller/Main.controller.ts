@@ -1,55 +1,84 @@
+import type { Button$PressEvent } from "sap/m/Button";
 import ComboBox from "sap/m/ComboBox";
-import DatePicker, { DatePicker$ChangeEvent } from "sap/m/DatePicker";
-import Input, { Input$LiveChangeEvent } from "sap/m/Input";
+import DatePicker from "sap/m/DatePicker";
+import Dialog, {
+  Dialog$BeforeOpenEvent,
+  type Dialog$AfterCloseEvent,
+} from "sap/m/Dialog";
+import Input from "sap/m/Input";
+import InputBase, { type InputBase$ChangeEvent } from "sap/m/InputBase";
 import Label from "sap/m/Label";
+import MessageBox from "sap/m/MessageBox";
+import MessageToast from "sap/m/MessageToast";
 import MultiComboBox from "sap/m/MultiComboBox";
+import type { ObjectIdentifier$TitlePressEvent } from "sap/m/ObjectIdentifier";
 import Select from "sap/m/Select";
 import FilterBar, {
-  FilterBar$FilterChangeEventParameters,
+  type FilterBar$FilterChangeEventParameters,
 } from "sap/ui/comp/filterbar/FilterBar";
 import FilterGroupItem from "sap/ui/comp/filterbar/FilterGroupItem";
 import PersonalizableInfo from "sap/ui/comp/smartvariants/PersonalizableInfo";
 import SmartVariantManagement from "sap/ui/comp/smartvariants/SmartVariantManagement";
+import type Control from "sap/ui/core/Control";
+import { ValueState } from "sap/ui/core/library";
 import JSONModel from "sap/ui/model/json/JSONModel";
+import type Row from "sap/ui/table/Row";
+import type { RowActionItem$PressEvent } from "sap/ui/table/RowActionItem";
 import Table from "sap/ui/table/Table";
-import { FilterData } from "../types/filter";
-import { Dict, Product, ProductData } from "../types/utils";
+import { MODEL_DATA } from "../constant/model";
+
+import type { FilterData } from "../types/filter";
+import type { Dict, Product } from "../types/utils";
 import Base from "./Base.controller";
-import DateFormat from "sap/ui/core/format/DateFormat";
-import Log from "sap/base/Log";
-import { Button$ClickEvent } from "sap/ui/webc/main/Button";
-import Dialog from "sap/m/Dialog";
-import Button from "sap/m/Button";
-import MessageBox from "sap/m/MessageBox";
-import VBox from "sap/m/VBox";
-import View from "sap/ui/core/mvc/View";
-import Form from "sap/ui/commons/form/Form";
-import FormContainer from "sap/ui/commons/form/FormContainer";
-import FormElement from "sap/ui/commons/form/FormElement";
-import ResponsiveGridLayout from "sap/ui/layout/form/ResponsiveGridLayout";
+import Component from "projecttest/Component";
+import ODataModel from "sap/ui/model/odata/v2/ODataModel";
+import { ODataSuccessResponse } from "projecttest/types/odata";
+import { Employee } from "projecttest/types/page/employee";
+import { Link$PressEvent } from "sap/m/Link";
+import FileUploader from "sap/ui/unified/FileUploader";
 
 export default class Main extends Base {
   private svm: SmartVariantManagement;
-  private expandedLable: Label;
+  private expandedLabel: Label;
   private snappedLabel: Label;
   private filterBar: FilterBar;
   private table: Table;
-  private view: View;
-  private detailDialog: Dialog | null;
-  private addRowDialog: Dialog | null;
+  private addProductDialog?: Dialog;
+  private productDetailDialog?: Dialog;
+  private editProductDialog?: Dialog;
+  private component: Component;
+  private fileUploader?: FileUploader;
 
   public onInit(): void {
-    const jSonModel = this.initSampleDataModel();
-    this.getView()?.setModel(jSonModel);
-
-    this.view = <View>this.getView();
-    this.view.setModel(jSonModel);
-
     this.svm = this.getControlById("svm");
-    this.expandedLable = this.getControlById("expandedLable");
+    this.expandedLabel = this.getControlById("expandedLabel");
     this.snappedLabel = this.getControlById("snappedLabel");
     this.filterBar = this.getControlById("filterbar");
     this.table = this.getControlById("table");
+    this.component = <Component>this.getOwnerComponent();
+
+    this.setModel(
+      new JSONModel({
+        currency: "VND",
+      }),
+      "view"
+    );
+
+    this.setModel(
+      new JSONModel({
+        ProductNames: MODEL_DATA.ProductNames,
+        ProductCategories: MODEL_DATA.ProductCategories,
+        ProductSuppliers: MODEL_DATA.ProductSuppliers,
+      }),
+      "searchHelp"
+    );
+    this.setModel(
+      new JSONModel({
+        rows: MODEL_DATA.ProductCollection,
+      }),
+      "table"
+    );
+    this.setModel(new JSONModel({}), "form");
 
     this.filterBar.registerFetchData(this.fetchData);
     this.filterBar.registerApplyData(this.applyData);
@@ -57,13 +86,41 @@ export default class Main extends Base {
 
     this.svm.addPersonalizableControl(
       new PersonalizableInfo({
-        type: "filterbar",
+        type: "filterBar",
         keyName: "persistencyKey",
         dataSource: "",
         control: this.filterBar,
       })
     );
     this.svm.initialise(() => {}, this.filterBar);
+
+    this.onFetchData();
+  }
+
+  public onOpenFile(oEvent: Link$PressEvent): void {
+    // Lấy URL hoặc đường dẫn từ thuộc tính 'text' của Link
+    const sFileUrl = oEvent.getSource().getText();
+
+    // Mở tệp tin trong một tab mới
+    window.open(sFileUrl, "_blank");
+  }
+
+  // lấy dữ liệu
+  private onFetchData() {
+    const tableMode = this.getModel("table");
+    const oDataModel = <ODataModel>this.component.getModel();
+    this.table.setBusy(true);
+
+    oDataModel.read("/EmployeeSet", {
+      success: (reponse: ODataSuccessResponse<Employee>) => {
+        tableMode.setProperty("/rows", reponse.results);
+        this.table.setBusy(false);
+      },
+      error: (error: Error) => {
+        this.table.setBusy(false);
+        console.log(error);
+      },
+    });
   }
 
   private fetchData = () => {
@@ -177,7 +234,7 @@ export default class Main extends Base {
       this.filterBar.retrieveFiltersWithValuesAsTextExpanded();
     const snappedText = this.filterBar.retrieveFiltersWithValuesAsText();
 
-    this.expandedLable.setText(expandedText);
+    this.expandedLabel.setText(expandedText);
     this.snappedLabel.setText(snappedText);
     this.table.setShowOverlay(true);
   }
@@ -207,687 +264,419 @@ export default class Main extends Base {
 
         return acc;
       }, {});
-
-    // console.log(values);
   }
 
-  public initSampleDataModel(): JSONModel {
-    const model = new JSONModel();
-
-    fetch(sap.ui.require.toUrl("projecttest/mockdata/product.json"))
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error("Network response was not ok.");
-        }
-        return response.json();
-      })
-      .then((data: ProductData) => {
-        model.setData(data);
-      })
-      .catch((error: Error) => {
-        Log.error("Failed to load JSON: " + error.message);
+  // add product
+  public async onOpenAddProduct() {
+    if (!this.addProductDialog) {
+      this.addProductDialog = <Dialog>await this.loadFragment({
+        name: "projecttest.view.fragments.AddProduct",
       });
-
-    // Trả về dữ liệu
-    return model;
-  }
-  // tạo dialog mới
-  // private createDetailDialog(): void {
-  //   if (this.detailDialog) {
-  //     this.detailDialog.destroy(); // Xóa dialog cũ nếu đã tồn tại
-  //   }
-
-  //   this.detailDialog = new Dialog({
-  //     title: "Chi Tiết",
-  //     content: new VBox({
-  //       items: [
-  //         new Label({ text: "Mã PR" }),
-  //         new Input({ id: "inputMaPr", enabled: true }),
-
-  //         new Label({ text: "Delete ID" }),
-  //         new Input({ id: "inputDeleteId", enabled: true }),
-
-  //         new Label({ text: "Số lượng" }),
-  //         new Input({ id: "inputQuantity", enabled: true }),
-
-  //         new Label({ text: "Nhà máy" }),
-  //         new Input({ id: "inputFactory", enabled: true }),
-
-  //         new Label({ text: "Mã PO" }),
-  //         new Input({ id: "inputPO", enabled: true }),
-
-  //         new Label({ text: "Ngày cập nhật" }),
-  //         new DatePicker({ id: "inputDateUpdate", enabled: true }),
-  //       ],
-  //     }),
-  //     beginButton: new Button({
-  //       text: "Close",
-  //       press: () => {
-  //         if (this.detailDialog) {
-  //           this.detailDialog.close();
-  //         }
-  //       },
-  //     }),
-  //     afterClose: () => {
-  //       if (this.detailDialog) {
-  //         this.detailDialog.destroy();
-  //         this.detailDialog = null; // Đặt lại thành null để tránh lỗi trong lần sử dụng sau
-  //       }
-  //     },
-  //     contentWidth: "400px",
-  //     contentHeight: "auto",
-  //     draggable: true,
-  //     resizable: true,
-  //   });
-  // }
-
-  private createAddRowDialog(): void {
-    if (this.addRowDialog) {
-      this.addRowDialog.destroy(); // Xóa dialog cũ nếu đã tồn tại
-      this.addRowDialog = null;
     }
 
-    this.addRowDialog = new Dialog({
-      title: "Add Row",
-      content: new Form({
-        layout: new ResponsiveGridLayout(),
-        formContainers: [
-          new FormContainer({
-            formElements: [
-              new FormElement({
-                label: new Label({ text: "Mã PR" }),
-                fields: [
-                  new Input({
-                    id: "inputMaPr",
-                    placeholder: "Enter MaPr",
-                    valueState: "None",
-                    change: this.onChangeValue.bind(this),
-                  }),
-                ],
-              }),
-              new FormElement({
-                label: new Label({ text: "Delete ID" }),
-                fields: [
-                  new Input({
-                    id: "inputDeleteId",
-                    placeholder: "Enter DeleteId",
-                    valueState: "None",
-                    change: this.onChangeValue.bind(this),
-                  }),
-                ],
-              }),
-              new FormElement({
-                label: new Label({ text: "Số lượng" }),
-                fields: [
-                  new Input({
-                    id: "inputQuantity",
-                    placeholder: "Enter Quantity",
-                    valueState: "None",
-                    change: this.onChangeValue.bind(this),
-                  }),
-                ],
-              }),
-              new FormElement({
-                label: new Label({ text: "Nhà máy" }),
-                fields: [
-                  new Input({
-                    id: "inputFactory",
-                    placeholder: "Enter Factory",
-                    valueState: "None",
-                    change: this.onChangeValue.bind(this),
-                  }),
-                ],
-              }),
-              new FormElement({
-                label: new Label({ text: "Mã PO" }),
-                fields: [
-                  new Input({
-                    id: "inputPO",
-                    placeholder: "Enter PO",
-                    valueState: "None",
-                    change: this.onChangeValue.bind(this),
-                  }),
-                ],
-              }),
-              new FormElement({
-                label: new Label({ text: "Ngày cập nhật" }),
-                fields: [
-                  new DatePicker({
-                    id: "inputUpdateDate",
-                    placeholder: "Enter Update Date",
-                    valueState: "None",
-                    change: this.onChangeValue.bind(this),
-                  }),
-                ],
-              }),
-            ],
-          }),
-        ],
-      }),
-      beginButton: new Button({
-        text: "Save",
-        press: () => {
-          // Xóa trạng thái lỗi trước khi kiểm tra
-          const inputs = this.getDialogFields(this.addRowDialog!);
-          Object.values(inputs).forEach((input) => {
-            if (input instanceof Input || input instanceof DatePicker) {
-              input.setValueState("None");
-              input.setValueStateText("");
-            }
-          });
+    // Lấy mô hình form và thiết lập dữ liệu mặc định nếu cần
+    const formModel = this.getModel("form");
+    formModel.setData({}); // Reset dữ liệu trong form nếu cần
 
-          if (this.validateFields(inputs)) {
-            // Tạo model mới và gán giá trị từ các trường nhập liệu
-            const newModelData = {
-              MaPr: this.getFieldValue(inputs.inputMaPr),
-              DeleteId: this.getFieldValue(inputs.inputDeleteId),
-              SoLuong:
-                parseFloat(this.getFieldValue(inputs.inputQuantity)) || 0,
-              NhaMay: this.getFieldValue(inputs.inputFactory),
-              MaPO: this.getFieldValue(inputs.inputPO),
-              DateUpdate: this.getFieldValue(inputs.inputUpdateDate),
-            };
-
-            // Cập nhật model chính
-            const model = this.getView()?.getModel() as JSONModel;
-            if (model) {
-              const data =
-                (model.getProperty("/ProductCollection") as Product[]) || [];
-              data.unshift(newModelData);
-              model.setProperty("/ProductCollection", data);
-
-              MessageBox.success("Thêm hàng thành công.");
-              this.addRowDialog?.close();
-            } else {
-              MessageBox.error("No data model available.");
-            }
-          } else {
-            MessageBox.error("Please fill all the required fields.");
-          }
-        },
-      }),
-      endButton: new Button({
-        text: "Cancel",
-        press: () => this.addRowDialog?.close(),
-      }),
-      afterClose: () => {
-        if (this.addRowDialog) {
-          this.addRowDialog.destroy();
-          this.addRowDialog = null; // Đặt lại thành null để tránh lỗi trong lần sử dụng sau
-        }
-      },
-      contentWidth: "400px",
-      contentHeight: "auto",
-      draggable: true,
-      resizable: true,
-    });
+    this.addProductDialog.bindElement("form>/");
+    this.fileUploader = <FileUploader>this.byId("fileUploader");
+    this.addProductDialog.open();
   }
 
-  public onAddRow(): void {
-    // Tạo dialog nếu chưa được tạo
-    if (!this.addRowDialog) {
-      this.createAddRowDialog();
-    }
+  public onAddProduct() {
+    const oDataModel = <ODataModel>this.getView()?.getModel(); // Lấy mô hình OData
+    const dialog = <Dialog>this.addProductDialog; // Dialog chứa form thêm sản phẩm
+    const formModel = this.getModel("form"); // Mô hình dữ liệu của form
 
-    this.addRowDialog?.open();
-  }
+    // Lấy dữ liệu từ mô hình form
+    const value = formModel.getData();
 
-  private onChangeValue(event: Input$LiveChangeEvent): void {
-    const input = event.getSource() as Input | DatePicker;
-    if (input) {
-      input.setValueState("None"); // Đặt trạng thái giá trị là "None" khi có thay đổi
-      input.setValueStateText(""); // Xóa thông báo lỗi
-    }
-  }
-
-  private getFieldValue(field: Input | DatePicker): string {
-    if (field instanceof Input) {
-      return field.getValue() || ""; // Trả về giá trị mặc định là chuỗi rỗng nếu không có giá trị
-    } else if (field instanceof DatePicker) {
-      const dateValue = field.getDateValue();
-      const dateFormat = DateFormat.getDateInstance({ pattern: "dd/MM/yyyy" });
-      return dateValue ? dateFormat.format(dateValue) : ""; // Trả về chuỗi rỗng nếu không có giá trị
-    }
-    return ""; // Trả về chuỗi rỗng nếu không phải Input hoặc DatePicker
-  }
-
-  private getDialogFields(dialog: Dialog): {
-    [key: string]: Input | DatePicker;
-  } {
-    const dialogContent = dialog.getContent()[0] as Form;
-    const fields: { [key: string]: Input | DatePicker } = {};
-
-    dialogContent.getFormContainers().forEach((container) => {
-      container.getFormElements().forEach((element) => {
-        element.getFields().forEach((field) => {
-          if (field instanceof Input || field instanceof DatePicker) {
-            fields[field.getId()] = field;
-          }
-        });
-      });
+    // Kiểm tra tính hợp lệ của các trường nhập liệu
+    const controls = this.getControlsByFieldGroupId<InputBase>({
+      control: dialog,
+      groupId: "FormField",
     });
 
-    return fields;
-  }
+    const isValid = this.validateControls(controls);
 
-  private validateFields(inputs: {
-    [key: string]: Input | DatePicker;
-  }): boolean {
-    let isValid = true;
-
-    Object.keys(inputs).forEach((key) => {
-      const input = inputs[key];
-      if (input instanceof Input) {
-        const value = input.getValue();
-        if (!value) {
-          input.setValueState("Error");
-          input.setValueStateText("This field cannot be empty.");
-          isValid = false;
-        } else {
-          input.setValueState("None");
-        }
-      } else if (input instanceof DatePicker) {
-        const dateValue = input.getDateValue();
-        if (!dateValue) {
-          input.setValueState("Error");
-          input.setValueStateText("This field cannot be empty.");
-          isValid = false;
-        } else {
-          input.setValueState("None");
-        }
-      }
-    });
-
-    return isValid;
-  }
-
-  // hàm chi tiết
-  public handleDetails(event: Button$ClickEvent): void {
-    const bindingContext = event.getSource().getBindingContext();
-
-    if (bindingContext) {
-      // Lấy đối tượng sản phẩm và gán kiểu Product
-      const product: Product = bindingContext.getObject() as Product;
-      const dateFormat = DateFormat.getDateInstance({ pattern: "d/M/yyyy" });
-
-      // Tạo dialog nếu chưa được tạo
-      if (!this.detailDialog) {
-        this.createDetailDialog();
-      }
-
-      // Cập nhật giá trị cho các trường trong dialog
-      const dialogContent = this.detailDialog?.getContent()[0] as VBox;
-      const inputs =
-        dialogContent?.getItems().reduce((acc, item) => {
-          if (item instanceof Input || item instanceof DatePicker) {
-            acc[item.getId()] = item;
-          }
-          return acc;
-        }, {} as { [key: string]: Input | DatePicker }) || {};
-
-      // Ép kiểu không an toàn, đảm bảo các trường chắc chắn tồn tại
-      (inputs.inputMaPr as Input).setValue(product.MaPr);
-      (inputs.inputDeleteId as Input).setValue(product.DeleteId);
-      (inputs.inputQuantity as Input).setValue(product.SoLuong.toString());
-      (inputs.inputFactory as Input).setValue(product.NhaMay);
-      (inputs.inputPO as Input).setValue(product.MaPO);
-      (inputs.inputDateUpdate as DatePicker).setValue(
-        dateFormat.format(new Date(product.DateUpdate))
-      );
-
-      this.detailDialog?.open();
-    } else {
-      MessageBox.error("No item selected.");
-    }
-  }
-
-  // hàm xóa 1 row
-
-  public onDeleteRow(event: Button$ClickEvent): void {
-    const bindingContext = event.getSource()?.getBindingContext();
-
-    if (bindingContext) {
-      const model = this.getView()?.getModel() as JSONModel;
-
-      if (model) {
-        const selectedId = bindingContext.getProperty("MaPr");
-
-        MessageBox.confirm("Bạn có chắc chắn muốn xóa không?", {
-          actions: [MessageBox.Action.OK, MessageBox.Action.CANCEL],
-          emphasizedAction: MessageBox.Action.OK,
-          onClose: (action: unknown) => {
-            if (action === MessageBox.Action.OK) {
-              const data = model.getProperty("/ProductCollection") as Product[];
-              const updatedData = data.filter(
-                (item: Product) => item.MaPr !== selectedId
-              );
-
-              model.setProperty("/ProductCollection", updatedData);
-              MessageBox.success("Xóa thành công");
-            }
-          },
-        });
-      } else {
-        MessageBox.error("No data model available.");
-      }
-    } else {
-      MessageBox.error("No item selected.");
-    }
-  }
-
-  // hàm xóa nhiều row
-  public onDeleteRows(): void {
-    const table = this.byId("table") as Table;
-    const model = this.getView()?.getModel() as JSONModel;
-    const selectedIndices = table.getSelectedIndices();
-
-    if (selectedIndices.length === 0) {
-      MessageBox.error("Bạn chưa chọn hàng nào");
+    if (!isValid) {
       return;
     }
 
-    MessageBox.confirm("Bạn có chắc chắn muốn xóa không?", {
-      actions: [MessageBox.Action.OK, MessageBox.Action.CANCEL],
-      emphasizedAction: MessageBox.Action.OK,
+    // Upload file
+    if (this.fileUploader) {
+      const fileUploader = this.fileUploader;
+
+      // Lắng nghe sự kiện uploadComplete trước khi thực hiện upload
+      fileUploader.attachUploadComplete((oEvent: any) => {
+        const parameters = oEvent.getParameters();
+        const status = parameters.status;
+        const response = parameters.responseRaw;
+
+        if (status === 200) {
+          // Giả sử URL của tệp tin được trả về trong response
+          const fileUrl = response;
+
+          // Cập nhật dữ liệu form với URL của tệp tin
+          value.File = fileUrl;
+
+          // Tạo dữ liệu OData
+          oDataModel.create("/EmployeeSet", value, {
+            success: (response: any) => {
+              MessageToast.show("Employee was successfully added");
+              this.onFetchData();
+            },
+            error: (error: Error) => {
+              MessageToast.show("Error adding employee");
+              console.error(error);
+            },
+          });
+        } else {
+          MessageToast.show("Error uploading file: " + response);
+          console.error("Upload error:", response);
+        }
+      });
+
+      // Thực hiện upload file
+      fileUploader.upload();
+    }
+
+    this.onCloseAddProduct();
+  }
+
+  public onCloseAddProduct() {
+    this.addProductDialog?.close();
+  }
+
+  public onFileChange(event: any) {
+    // Xử lý sự kiện khi người dùng chọn file
+    const fileUploader = <FileUploader>event.getSource();
+    const file = fileUploader.getValue();
+
+    // Kiểm tra xem người dùng đã chọn file chưa
+    if (file) {
+      console.log("Selected file:", file);
+    }
+  }
+
+  // edit product
+  public async onOpenEditProduct(event: RowActionItem$PressEvent) {
+    const source = event.getSource();
+    const rowIndex = event.getParameter("row")?.getIndex();
+    const row = <Product>source.getBindingContext("table")?.getObject();
+
+    this.getModel("form").setData(row);
+
+    if (!this.editProductDialog) {
+      this.editProductDialog = await (<Promise<Dialog>>this.loadFragment({
+        name: "projecttest.view.fragments.EditProduct",
+      }));
+    }
+
+    this.editProductDialog.bindElement("form>/");
+    this.editProductDialog.bindElement(`table>/rows/${rowIndex}`);
+    this.editProductDialog.open();
+  }
+  public onBeforeEditProduct(event: Dialog$BeforeOpenEvent) {
+    const oDataModel = <ODataModel>this.component.getModel();
+    const formModel = this.getModel("form");
+    const dialog = event.getSource();
+    const row = <Employee>dialog.getBindingContext("table")?.getObject();
+
+    dialog.setBusy(true);
+    const key = oDataModel.createKey("/EmployeeSet", row);
+    oDataModel.read(key, {
+      success: (response: Employee) => {
+        formModel.setData(response);
+        dialog.bindElement("form>/");
+        dialog.setBusy(false);
+      },
+      error: (error: Error) => {
+        dialog.setBusy(false);
+        console.log(error);
+      },
+    });
+  }
+
+  public onCloseEditProduct() {
+    this.editProductDialog?.close();
+  }
+
+  public onEditProduct(event: Button$PressEvent) {
+    const oDataModel = <ODataModel>this.component.getModel();
+    const dialog = <Dialog>this.editProductDialog;
+
+    const controls = this.getControlsByFieldGroupId<InputBase>({
+      control: this.editProductDialog,
+      groupId: "FormField",
+    });
+
+    const isValid = this.validateControls(controls);
+
+    if (!isValid) {
+      return;
+    }
+
+    const value = <Employee>this.getModel("form").getData();
+
+    dialog.setBusy(true);
+    const key = oDataModel.createKey("/EmployeeSet", value);
+    oDataModel.update(key, value, {
+      success: (response: Employee) => {
+        MessageToast.show("Product was successfully updated");
+        this.onFetchData();
+      },
+      error: (error: Error) => {
+        dialog.setBusy(false);
+      },
+    });
+
+    this.onCloseEditProduct();
+  }
+
+  // chi tiết
+  public async onOpenProductDetail(event: ObjectIdentifier$TitlePressEvent) {
+    const source = event.getSource();
+    const path = <string>source.getBindingContext("table")?.getPath();
+
+    if (!this.productDetailDialog) {
+      this.productDetailDialog = await (<Promise<Dialog>>this.loadFragment({
+        name: "projecttest.view.fragments.DetailProduct",
+      }));
+    }
+
+    this.productDetailDialog.bindElement(`table>${path}`);
+    this.productDetailDialog.open();
+  }
+
+  public onBeforeOpenEmployeeDetail(event: Dialog$BeforeOpenEvent) {
+    const oDataModel = <ODataModel>this.component.getModel();
+    const formModel = this.getModel("form");
+    const dialog = event.getSource();
+    const row = <Employee>dialog.getBindingContext("table")?.getObject();
+
+    dialog.setBusy(true);
+    const key = oDataModel.createKey("/EmployeeSet", row);
+
+    oDataModel.read(key, {
+      success: (response: Employee) => {
+        formModel.setData(response);
+        dialog.bindElement("form>/");
+        dialog.setBusy(false);
+      },
+      error: (error: Error) => {
+        dialog.setBusy(false);
+        console.log(error);
+      },
+    });
+  }
+
+  public onCloseProductDetail() {
+    this.productDetailDialog?.close();
+  }
+
+  // xóa dữ liệu dialog
+  public onAfterCloseDialog(event: Dialog$AfterCloseEvent) {
+    const dialog = event.getSource();
+
+    const controls = this.getControlsByFieldGroupId<InputBase>({
+      control: dialog,
+      groupId: "FormField",
+    });
+
+    this.clearControlErrorMessages(controls);
+
+    dialog.unbindElement("form");
+    dialog.unbindElement("table");
+    this.getModel("form").setData({});
+  }
+
+  // xóa row
+  public onDeleteProduct(event: RowActionItem$PressEvent) {
+    const oDataModel = <ODataModel>this.component.getModel();
+    const row = <Employee>(
+      event.getSource().getBindingContext("table")?.getObject()
+    );
+
+    MessageBox.confirm("Do you want to delete this row?", {
+      actions: [MessageBox.Action.DELETE, MessageBox.Action.CANCEL],
+      emphasizedAction: MessageBox.Action.DELETE,
       onClose: (action: unknown) => {
-        if (action === MessageBox.Action.OK) {
-          const data = model.getProperty("/ProductCollection") as Product[];
+        if (action === MessageBox.Action.DELETE) {
+          const key = oDataModel.createKey("/EmployeeSet", row);
+          // `/EmployeeSet(Employeeid='${row.Employeeid}')`
+          oDataModel.remove(key, {
+            success: () => {
+              this.onFetchData();
+              MessageToast.show("Employee was successfully deleted");
+            },
+            error: (error: Error) => {
+              console.log(error);
+            },
+          });
+        }
+      },
+    });
+  }
+  // xóa rows
+  public onDeleteProducts() {
+    const tableModel = <ODataModel>this.component.getModel();
+    const selectedIndices = this.table.getSelectedIndices();
 
-          // Sử dụng filter để tạo mảng mới mà không chứa các mục đã chọn để xóa
-          const filteredData = data.filter(
-            (_, index) => !selectedIndices.includes(index)
-          );
+    if (!selectedIndices.length) {
+      MessageToast.show("Vui lòng chọn hàng để xóa");
+      return;
+    }
 
-          model.setProperty("/ProductCollection", filteredData);
-          table.clearSelection(); // Deselect all rows
-          MessageBox.success("Xóa thành công.");
+    MessageBox.confirm("Bạn có muốn xóa các hàng đã chọn?", {
+      actions: [MessageBox.Action.DELETE, MessageBox.Action.CANCEL],
+      emphasizedAction: MessageBox.Action.DELETE,
+      onClose: (action: unknown) => {
+        if (action === MessageBox.Action.DELETE) {
+          const oDataModel = this.getView()?.getModel() as ODataModel;
+          const rows = <Employee[]>tableModel.getProperty("/rows");
+
+          // Lấy khóa của các hàng đã chọn
+          const selectedKeys = selectedIndices.map((index) => {
+            return rows[index].Employeeid; // Thay thế bằng khóa chính của bạn
+          });
+
+          // Xóa từng hàng
+          const deletePromises = selectedKeys.map((key) => {
+            const itemKey = oDataModel.createKey("/EmployeeSet", {
+              Employeeid: key,
+            });
+            return new Promise<void>((resolve, reject) => {
+              oDataModel.remove(itemKey, {
+                success: () => resolve(),
+                error: (error: Error) => reject(error),
+              });
+            });
+          });
+
+          Promise.all(deletePromises)
+            .then(() => {
+              // Cập nhật dữ liệu mô hình sau khi xóa thành công
+              return this.onFetchData(); // Cập nhật dữ liệu từ server
+            })
+            .then(() => {
+              // Bỏ chọn tất cả các hàng
+              this.table.clearSelection();
+
+              // Cập nhật mô hình dữ liệu để loại bỏ các hàng đã xóa
+              const remainingRows = rows.filter(
+                (_, index) => !selectedIndices.includes(index)
+              );
+              tableModel.setProperty("/rows", remainingRows);
+
+              MessageToast.show("Đã xóa thành công");
+            })
+            .catch((error: Error) => {
+              MessageToast.show("Lỗi khi xóa sản phẩm");
+              console.error(error);
+            });
         }
       },
     });
   }
 
-  // hàm thêm row
-  // public onAddRow(): void {
-  //   // Hàm kiểm tra tính hợp lệ của các trường nhập liệu
-  //   const validateFields = (inputs: {
-  //     [key: string]: Input | DatePicker;
-  //   }): boolean => {
-  //     let isValid = true;
+  // Table
+  public onRowSelectionChange() {
+    const indices = this.table.getSelectedIndices();
+    this.getModel("table").setProperty("/selectedIndices", [...indices]);
+  }
 
-  //     Object.keys(inputs).forEach((key) => {
-  //       const input = inputs[key];
-  //       if (input instanceof Input) {
-  //         const value = input.getValue();
-  //         if (!value) {
-  //           input.setValueState("Error");
-  //           input.setValueStateText("This field cannot be empty.");
-  //           isValid = false;
-  //         } else {
-  //           input.setValueState("None");
-  //         }
-  //       } else if (input instanceof DatePicker) {
-  //         const dateValue = input.getDateValue();
-  //         if (!dateValue) {
-  //           input.setValueState("Error");
-  //           input.setValueStateText("This field cannot be empty.");
-  //           isValid = false;
-  //         } else {
-  //           input.setValueState("None");
-  //         }
-  //       }
-  //     });
-
-  //     return isValid;
-  //   };
-
-  //   // Hàm tạo trường nhập liệu (Input hoặc DatePicker)
-  //   const createField = (
-  //     id: string,
-  //     placeholder: string,
-  //     type: "Input" | "DatePicker"
-  //   ): Input | DatePicker => {
-  //     if (type === "Input") {
-  //       return new Input({
-  //         id: id,
-  //         placeholder: placeholder,
-  //         tooltip: "This field cannot be empty.",
-  //         valueState: "None",
-  //         liveChange: (event: Input$LiveChangeEvent) => {
-  //           const input = event.getSource();
-  //           const value = input.getValue();
-  //           if (!value) {
-  //             input.setValueState("Error");
-  //             input.setValueStateText("This field cannot be empty.");
-  //           } else {
-  //             input.setValueState("None");
-  //           }
-  //         },
-  //       });
-  //     } else {
-  //       return new DatePicker({
-  //         id: id,
-  //         placeholder: placeholder,
-  //         tooltip: "This field cannot be empty.",
-  //         valueState: "None",
-  //         change: (event: DatePicker$ChangeEvent) => {
-  //           const datePicker = event.getSource();
-  //           const dateValue = datePicker.getDateValue();
-  //           if (!dateValue) {
-  //             datePicker.setValueState("Error");
-  //             datePicker.setValueStateText("This field cannot be empty.");
-  //           } else {
-  //             datePicker.setValueState("None");
-  //           }
-  //         },
-  //       });
-  //     }
-  //   };
-
-  //   // Tạo các trường nhập liệu
-  //   const inputs: { [key: string]: Input | DatePicker } = {
-  //     inputMaPr: createField("inputMaPr", "Enter MaPr", "Input"),
-  //     inputDeleteId: createField("inputDeleteId", "Enter DeleteId", "Input"),
-  //     inputQuantity: createField("inputQuantity", "Enter Quantity", "Input"),
-  //     inputFactory: createField("inputFactory", "Enter Factory", "Input"),
-  //     inputPO: createField("inputPO", "Enter PO", "Input"),
-  //     inputUpdateDate: createField(
-  //       "inputUpdateDate",
-  //       "Enter Update Date",
-  //       "DatePicker"
-  //     ),
-  //   };
-
-  //   // Tạo dialog với các trường nhập liệu
-  //   const dialog = new Dialog({
-  //     title: "Add Row",
-  //     content: new Form({
-  //       layout: new ResponsiveGridLayout(),
-  //       formContainers: [
-  //         new FormContainer({
-  //           formElements: Object.keys(inputs).map(
-  //             (key) =>
-  //               new FormElement({
-  //                 label: new Label({ text: key }),
-  //                 fields: [inputs[key]],
-  //               })
-  //           ),
-  //         }),
-  //       ],
-  //     }),
-  //     beginButton: new Button({
-  //       text: "Save",
-  //       press: () => {
-  //         // Xóa trạng thái lỗi trước khi kiểm tra
-  //         Object.values(inputs).forEach((input) => {
-  //           if (input instanceof Input || input instanceof DatePicker) {
-  //             input.setValueState("None");
-  //             input.setValueStateText("");
-  //           }
-  //         });
-
-  //         if (validateFields(inputs)) {
-  //           // Tạo model mới và gán giá trị từ các trường nhập liệu
-  //           const newModelData = {
-  //             MaPr: this.getFieldValue(inputs.inputMaPr),
-  //             DeleteId: this.getFieldValue(inputs.inputDeleteId),
-  //             SoLuong:
-  //               parseFloat(this.getFieldValue(inputs.inputQuantity)) || 0,
-  //             NhaMay: this.getFieldValue(inputs.inputFactory),
-  //             MaPO: this.getFieldValue(inputs.inputPO),
-  //             DateUpdate: this.getFieldValue(inputs.inputUpdateDate),
-  //           };
-
-  //           // Cập nhật model chính
-  //           const model = this.getView()?.getModel() as JSONModel;
-  //           if (model) {
-  //             const data =
-  //               (model.getProperty("/ProductCollection") as Product[]) || [];
-  //             data.unshift(newModelData);
-  //             model.setProperty("/ProductCollection", data);
-
-  //             // Hiển thị thông báo thành công
-  //             MessageBox.success("Thêm hàng thành công.");
-
-  //             dialog.close();
-  //           } else {
-  //             MessageBox.error("No data model available.");
-  //           }
-  //         } else {
-  //           MessageBox.error("Please fill all the required fields.");
-  //         }
-  //       },
-  //     }),
-  //     endButton: new Button({
-  //       text: "Cancel",
-  //       press: () => dialog.close(),
-  //     }),
-  //     afterClose: () => dialog.destroy(), // Xóa dialog sau khi đóng
-  //     contentWidth: "400px",
-  //     contentHeight: "auto",
-  //     draggable: true,
-  //     resizable: true,
-  //   });
-
-  //   dialog.open();
-  // }
-
-  // lấy ra số thứ tự của các ô mình đã chọn
-
-  // public getSelectedIndices() {
-  //   const indices = this.byId("table").getSelectedIndices();
-  //   let msg;
-  //   if (indices.length < 1) {
-  //     msg = "no item selected";
-  //   } else {
-  //     msg = indices;
-  //   }
-  //   MessageToast.show(msg);
-  // }
-  // Lấy ra chiều dài của mảng
-  // public getContextByIndex() {
-  //   const table = this.byId("table");
-  //   const index = table.getSelectedIndex();
-  //   let msg;
-  //   if (index < 0) {
-  //     msg = "no item selected";
-  //   } else {
-  //     msg = table.getContextByIndex(index);
-  //   }
-  //   MessageToast.show(msg);
-  // }
-
-  // xóa những ô mình chọn
-  // public clearSelection() {
-  //   this.byId("table").clearSelection();
-  // }
-
-  // bật tắt chọn tất cả
-  // public onSwitchChange(event: Switch$ChangeEvent) {
-  //   const table = this.byId("table");
-  //   table.setEnableSelectAll(event.getParameter("state"));
-  // }
-
-  private createDetailDialog(): void {
-    if (this.detailDialog) {
-      this.detailDialog.destroy();
-      this.detailDialog = null;
+  // Messaging
+  public onChangeValue(event: InputBase$ChangeEvent) {
+    const source = event.getSource();
+    if (source.getVisible()) {
+      this.validateInputs(source);
     }
+  }
 
-    this.detailDialog = new Dialog({
-      title: "Chi Tiết",
-      content: new VBox({
-        items: [
-          new Label({ text: "Mã PR" }),
-          new Input({ id: "inputMaPr", enabled: true }),
-
-          new Label({ text: "Delete ID" }),
-          new Input({ id: "inputDeleteId", enabled: true }),
-
-          new Label({ text: "Số lượng" }),
-          new Input({ id: "inputQuantity", enabled: true }),
-
-          new Label({ text: "Nhà máy" }),
-          new Input({ id: "inputFactory", enabled: true }),
-
-          new Label({ text: "Mã PO" }),
-          new Input({ id: "inputPO", enabled: true }),
-
-          new Label({ text: "Ngày cập nhật" }),
-          new DatePicker({ id: "inputDateUpdate", enabled: true }),
-        ],
-      }),
-      beginButton: new Button({
-        text: "Close",
-        press: () => {
-          this.detailDialog?.close();
-        },
-      }),
-      afterClose: () => {
-        this.detailDialog?.destroy();
-        this.detailDialog = null;
-      },
-      contentWidth: "400px",
-      contentHeight: "auto",
-      draggable: true,
-      resizable: true,
+  private clearControlErrorMessages(controls: InputBase[]) {
+    controls.forEach((control) => {
+      control.setValueState(ValueState.None);
+      control.setValueStateText("");
     });
   }
 
-  // public handleDetails(event: Button$ClickEvent): void {
-  //   const bindingContext = event.getSource().getBindingContext();
+  private getControlsByFieldGroupId<T extends Control>(props: {
+    control?: Control;
+    groupId: string;
+  }) {
+    const { control, groupId } = props;
 
-  //   if (bindingContext) {
-  //     const product: Product = bindingContext.getObject() as Product;
+    if (!control) return [];
 
-  //     // Chuyển đổi giá trị ngày từ chuỗi thành đối tượng Date, hoặc null nếu không có giá trị
-  //     const dateUpdateValue: Date | null = product.DateUpdate
-  //       ? new Date(product.DateUpdate)
-  //       : null;
+    const controls = control
+      .getControlsByFieldGroupId(groupId)
+      .filter((control) => {
+        const isVisible = control.getVisible();
+        const isValidInput = control.isA(["sap.m.Input", "sap.m.DatePicker"]);
 
-  //     if (!this.detailDialog) {
-  //       this.createDetailDialog();
-  //     }
+        return isVisible && isValidInput;
+      });
 
-  //     if (this.detailDialog) {
-  //       const inputs = this.getDialogFields(this.detailDialog);
+    return controls as T[];
+  }
 
-  //       (inputs["inputMaPr"] as Input)?.setValue(product.MaPr || "");
-  //       (inputs["inputDeleteId"] as Input)?.setValue(product.DeleteId || "");
-  //       (inputs["inputQuantity"] as Input)?.setValue(
-  //         product.SoLuong ? product.SoLuong.toString() : ""
-  //       );
-  //       (inputs["inputFactory"] as Input)?.setValue(product.NhaMay || "");
-  //       (inputs["inputPO"] as Input)?.setValue(product.MaPO || "");
+  private validateControls(controls: InputBase[]) {
+    let isValid = false;
+    let isError = false;
 
-  //       // Chỉ đặt giá trị ngày nếu dateUpdateValue không phải là null
-  //       (inputs["inputDateUpdate"] as DatePicker)?.setDateValue(
-  //         dateUpdateValue ?? undefined
-  //       );
+    controls.forEach((control) => {
+      isError = this.validateInputs(control);
+      isValid = isValid || isError;
+    });
 
-  //       this.detailDialog.open();
-  //     }
-  //   } else {
-  //     MessageBox.error("No item selected.");
-  //   }
-  // }
+    return !isValid;
+  }
+
+  private validateInputs(source: InputBase) {
+    let isError = false;
+    let isRequiredError = false;
+
+    if (!source.getBindingContext("form")) {
+      return false;
+    }
+
+    source.setValueState(ValueState.None);
+    source.setValueStateText("");
+
+    const isRequired = source.getRequired();
+
+    if (source.isA<MultiComboBox>("sap.m.MultiComboBox")) {
+      const value = source.getSelectedKeys();
+      if (!value.length && isRequired) {
+        isRequiredError = true;
+      }
+    } else if (source.isA<DatePicker>("sap.m.DatePicker")) {
+      const value = source.getValue();
+      if (!value && isRequired) {
+        isRequiredError = true;
+      }
+    } else if (source.isA<Input>("sap.m.Input")) {
+      const value = source.getValue();
+      if (!value && isRequired) {
+        isRequiredError = true;
+      }
+    }
+
+    if (isRequiredError) {
+      source.setValueState(ValueState.Error);
+      source.setValueStateText("Required");
+      isError = true;
+    }
+
+    return isError;
+  }
+
+  public formatDate(date: Date): string {
+    return new Intl.DateTimeFormat("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    }).format(date);
+  }
 }

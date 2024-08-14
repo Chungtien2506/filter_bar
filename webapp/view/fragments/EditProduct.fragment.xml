@@ -1,0 +1,126 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:f="sap.ui.layout.form"
+>
+    <Dialog
+        id="editProductDialog"
+        title="Edit Product"
+        beforeOpen="onBeforeEditProduct"
+        afterClose="onAfterCloseDialog"
+        contentWidth="400px"
+    >
+        <content>
+            <f:SimpleForm
+                id="editProductForm"
+                editable="true"
+            >
+                <f:content>
+                    <Label text="ID" />
+                    <Input
+                        required="true"
+                        value="{form>Employeeid}"
+                        editable="false"
+                    />
+                    <Label text="Full Name" />
+                    <Input
+                        required="true"
+                        value="{form>Fullname}"
+                        change="onChangeValue"
+                        fieldGroupIds="FormField"
+                    />
+                    <Label text="Gender" />
+                    <Input
+                        required="true"
+                        value="{form>Gender}"
+                        change="onChangeValue"
+                        fieldGroupIds="FormField"
+                    />
+                    <Label text="StartDate" />
+                    <DatePicker
+                        required="true"
+                        change="onChangeValue"
+                        fieldGroupIds="FormField"
+                        value="{
+                                path: 'form>StartDate',
+                                type: 'sap.ui.model.type.Date',
+								formatOptions: {source: {pattern: 'dd.MM.yyyy'}, pattern: 'dd.MM.yyyy'}
+                            }"
+                    />
+                    <Label text="Contracttype" />
+                    <Input
+                        required="true"
+                        value="{form>Contracttype}"
+                        change="onChangeValue"
+                        fieldGroupIds="FormField"
+                    />
+                    <Label text="Birthdate" />
+                    <DatePicker
+                        required="true"
+                        change="onChangeValue"
+                        fieldGroupIds="FormField"
+                        value="{
+                                path: 'form>Birthdate',
+                                type: 'sap.ui.model.type.Date',
+								formatOptions: {source: {pattern: 'dd.MM.yyyy'}, pattern: 'dd.MM.yyyy'}
+                            }"
+                    />
+                    <Label text="Address" />
+                    <Input
+                        required="true"
+                        value="{form>Address}"
+                        change="onChangeValue"
+                        fieldGroupIds="FormField"
+                    />
+                    <Label text="Phone" />
+                    <Input
+                        required="true"
+                        value="{form>Phone}"
+                        change="onChangeValue"
+                        fieldGroupIds="FormField"
+                    />
+                    <Label text="Plans" />
+                    <Input
+                        required="true"
+                        value="{form>Plans}"
+                        change="onChangeValue"
+                        fieldGroupIds="FormField"
+                    />
+                    <Label text="Salary" />
+                    <Input
+                        required="true"
+                        value="{
+                           parts: [
+                                'form>Salary',
+                                'view>/currency'
+                            ],
+                            type: 'sap.ui.model.type.Currency',
+                            formatOptions: {
+                                showMeasure: false,
+                                decimalSeparator: ',',
+                                groupingSeparator: '.'
+                            }
+                        }"
+                        change="onChangeValue"
+                        fieldGroupIds="FormField"
+                        description="VND"
+                    />
+                </f:content>
+            </f:SimpleForm>
+        </content>
+        <beginButton>
+            <Button
+                text="Save"
+                type="Emphasized"
+                icon="sap-icon://save"
+                press="onEditProduct"
+            />
+        </beginButton>
+        <endButton>
+            <Button
+                text="Close"
+                press="onCloseEditProduct"
+            />
+        </endButton>
+    </Dialog>
+</core:FragmentDefinition>

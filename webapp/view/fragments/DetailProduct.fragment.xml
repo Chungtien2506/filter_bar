@@ -1,0 +1,63 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:f="sap.ui.layout.form"
+>
+    <Dialog
+        id="product-detail-dialog"
+        title="Product Detail"
+        beforeOpen="onBeforeOpenEmployeeDetail"
+        afterClose="onAfterCloseDialog"
+        contentWidth="400px"
+    >
+        <content>
+            <f:SimpleForm
+                id="product-detail-form"
+                editable="true"
+            >
+                <f:content>
+                    <Label text="ID" />
+                    <Text text="{form>Employeeid}" />
+                    <Label text="Full Name" />
+                    <Text text="{form>Fullname}" />
+                    <Label text="Gender" />
+                    <Text text="{form>Gender}" />
+                    <Label text="StartDate" />
+                    <Text text="{form>StartDate}" />
+                    <Label text="Contracttype" />
+                    <Text text="{form>Contracttype}" />
+                    <Label text="Birthdate" />
+                    <Text text="{form>Birthdate}" />
+                    <Label text="Address" />
+                    <Text text="{form>Address}" />
+                    <Label text="Phone" />
+                    <Text text="{form>Phone}" />
+                    <Label text="Plans" />
+                    <Text text="{form>Plans}" />
+                    <Label text="Salary" />
+                    <Text
+                        text="{
+                            parts: [
+                                'form>Salary',
+                                'view>/currency'
+                            ],
+                            type: 'sap.ui.model.type.Currency',
+                            formatOptions: {                              
+                                decimalSeparator: ',',
+                                groupingSeparator: '.'
+                            }
+                        }"
+                    />
+                    <Label text="File" />
+                    <Text text="{form>File}" />
+                </f:content>
+            </f:SimpleForm>
+        </content>
+        <endButton>
+            <Button
+                text="Close"
+                press="onCloseProductDetail"
+            />
+        </endButton>
+    </Dialog>
+</core:FragmentDefinition>
